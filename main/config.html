@@ -6,36 +6,50 @@
 <title>WiFi Radar - WiFi 配置</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Segoe UI',system-ui,sans-serif;background:#0a0e17;color:#e0e6f0;min-height:100vh;display:flex;align-items:center;justify-content:center}
-.card{background:linear-gradient(145deg,#141b2d,#111827);border:1px solid #1e2a4a;border-radius:16px;padding:40px;width:420px;max-width:95vw}
-h1{font-size:22px;margin-bottom:5px;background:linear-gradient(90deg,#4fc3f7,#81d4fa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.subtitle{color:#8892b0;font-size:13px;margin-bottom:25px}
-.form-group{margin-bottom:18px}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#0a0e17;color:#e0e6f0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px;padding-bottom:env(safe-area-inset-bottom)}
+.card{background:linear-gradient(145deg,#141b2d,#111827);border:1px solid #1e2a4a;border-radius:16px;padding:32px 28px;width:420px;max-width:100%}
+h1{font-size:20px;margin-bottom:5px;background:linear-gradient(90deg,#4fc3f7,#81d4fa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.subtitle{color:#8892b0;font-size:13px;margin-bottom:20px}
+.form-group{margin-bottom:16px}
 label{display:block;font-size:13px;color:#8892b0;margin-bottom:6px}
-input,select{width:100%;padding:12px 14px;background:#0d1225;border:1px solid #1e2a4a;border-radius:8px;color:#e0e6f0;font-size:15px;outline:none;transition:.3s}
+input,select{width:100%;padding:12px 14px;background:#0d1225;border:1px solid #1e2a4a;border-radius:8px;color:#e0e6f0;font-size:16px;outline:none;transition:.3s}
 input:focus,select:focus{border-color:#4fc3f7;box-shadow:0 0 0 3px rgba(79,195,247,.15)}
 .btn{width:100%;padding:14px;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;transition:.3s;margin-top:8px}
 .btn-primary{background:linear-gradient(135deg,#4fc3f7,#0288d1);color:#fff}
 .btn-primary:hover{transform:translateY(-1px);box-shadow:0 4px 15px rgba(79,195,247,.3)}
 .btn-secondary{background:#1e2a4a;color:#8892b0;margin-top:10px}
 .btn-secondary:hover{background:#2a3a5c;color:#e0e6f0}
-.scan-result{padding:12px;background:#0d1225;border:1px solid #1e2a4a;border-radius:8px;margin:6px 0;cursor:pointer;transition:.3s;display:flex;justify-content:space-between;align-items:center}
+.scan-result{padding:10px 12px;background:#0d1225;border:1px solid #1e2a4a;border-radius:8px;margin:5px 0;cursor:pointer;transition:.3s;display:flex;justify-content:space-between;align-items:center;gap:8px}
 .scan-result:hover{border-color:#4fc3f7;background:#141b2d}
-.scan-ssid{font-size:14px}
-.scan-rssi{font-size:12px;color:#8892b0}
-.scan-lock{color:#ffd54f;font-size:11px;margin-left:4px}
-.scan-list{max-height:240px;overflow-y:auto;margin:10px 0}
-.scan-btn{background:none;border:1px solid #1e2a4a;color:#4fc3f7;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:13px;margin-bottom:15px}
+.scan-ssid{font-size:14px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.scan-rssi{font-size:11px;color:#8892b0;white-space:nowrap}
+.scan-lock{color:#ffd54f;font-size:11px;margin-left:2px}
+.scan-list{max-height:220px;overflow-y:auto;margin:8px 0;-webkit-overflow-scrolling:touch}
+.scan-btn{background:none;border:1px solid #1e2a4a;color:#4fc3f7;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:13px;margin-bottom:12px}
 .scan-btn:hover{background:#1e2a4a}
-.back-link{display:inline-block;margin-top:20px;color:#8892b0;text-decoration:none;font-size:13px}
+.back-link{display:inline-block;margin-top:16px;color:#8892b0;text-decoration:none;font-size:13px}
 .back-link:hover{color:#4fc3f7}
-.toast{position:fixed;top:20px;right:20px;padding:14px 22px;border-radius:8px;font-size:14px;opacity:0;transition:.3s;z-index:100}
+.toast{position:fixed;top:16px;left:16px;right:16px;padding:14px 18px;border-radius:8px;font-size:14px;opacity:0;transition:.3s;z-index:100;text-align:center}
 .toast.show{opacity:1}
 .toast.success{background:#2e7d32;color:#fff}
 .toast.error{background:#c62828;color:#fff}
-.divider{border:none;border-top:1px solid #1e2a4a;margin:20px 0}
-.current-info{font-size:13px;color:#8892b0;margin-bottom:15px}
+.divider{border:none;border-top:1px solid #1e2a4a;margin:16px 0}
+.current-info{font-size:13px;color:#8892b0;margin-bottom:12px;word-break:break-all}
 .current-info span{color:#4fc3f7}
+
+@media(max-width:480px){
+  body{padding:10px}
+  .card{padding:24px 18px;border-radius:12px}
+  h1{font-size:17px}
+  .subtitle{font-size:12px;margin-bottom:16px}
+  .form-group{margin-bottom:14px}
+  input,select{padding:11px 12px;font-size:16px}
+  .btn{padding:13px;font-size:14px}
+  .scan-result{padding:9px 10px}
+  .scan-ssid{font-size:13px}
+  .scan-rssi{font-size:10px}
+  .toast{left:10px;right:10px;top:10px;font-size:13px;padding:12px 14px}
+}
 </style>
 </head>
 <body>
