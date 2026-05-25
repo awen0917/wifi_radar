@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WiFi Radar - 室内人员感知</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#0a0e17;color:#e0e6f0;min-height:100vh}
+.header{background:linear-gradient(135deg,#1a1f35,#0d1225);padding:20px 30px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #1e2a4a}
+.header h1{font-size:22px;background:linear-gradient(90deg,#4fc3f7,#81d4fa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.header .status-bar{display:flex;gap:20px;align-items:center;font-size:13px}
+.status-dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:6px}
+.status-dot.online{background:#4caf50;box-shadow:0 0 8px #4caf50}
+.status-dot.offline{background:#f44336}
+.container{max-width:1400px;margin:0 auto;padding:20px;display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.card{background:linear-gradient(145deg,#141b2d,#111827);border:1px solid #1e2a4a;border-radius:12px;padding:20px;position:relative;overflow:hidden}
+.card h2{font-size:14px;color:#8892b0;text-transform:uppercase;letter-spacing:1px;margin-bottom:15px}
+.presence-card{grid-column:1/-1;display:flex;align-items:center;justify-content:center;flex-direction:column;padding:40px}
+.presence-icon{font-size:80px;margin-bottom:15px;transition:all .5s}
+.presence-icon.occupied{color:#ff6b6b;text-shadow:0 0 40px rgba(255,107,107,.5)}
+.presence-icon.empty{color:#4caf50;text-shadow:0 0 40px rgba(76,175,80,.5)}
+.presence-text{font-size:36px;font-weight:700;margin-bottom:5px}
+.presence-text.occupied{color:#ff6b6b}
+.presence-text.empty{color:#4caf50}
+.presence-sub{font-size:14px;color:#8892b0}
+.stats-row{grid-column:1/-1;display:grid;grid-template-columns:repeat(4,1fr);gap:15px}
+.stat-card{text-align:center;padding:15px}
+.stat-value{font-size:28px;font-weight:700;margin:8px 0}
+.stat-label{font-size:12px;color:#8892b0}
+.stat-value.rssi{color:#4fc3f7}
+.stat-value.variance{color:#ffd54f}
+.stat-value.confidence{color:#ce93d8}
+.stat-value.uptime{color:#81c784}
+canvas{width:100%!important;height:200px!important;border-radius:8px;background:#0a0e17}
+.wave-canvas{height:250px!important}
+.legend{display:flex;gap:15px;margin-top:8px;justify-content:center}
+.legend span{font-size:11px;color:#8892b0;display:flex;align-items:center;gap:4px}
+.legend span::before{content:'';width:12px;height:3px;border-radius:2px}
+.legend .l-var::before{background:#ffd54f}
+.legend .l-rssi::before{background:#4fc3f7}
+.legend .l-conf::before{background:#ce93d8}
+.config-link{position:fixed;bottom:20px;right:20px;background:#1e2a4a;color:#8892b0;border:none;padding:10px 18px;border-radius:8px;cursor:pointer;font-size:13px;text-decoration:none;transition:.3s}
+.config-link:hover{background:#2a3a5c;color:#e0e6f0}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.pulse{animation:pulse 2s infinite}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>&#9678; WiFi Radar - 室内人员感知</h1>
+  <div class="status-bar">
+    <span><span class="status-dot online" id="connDot"></span><span id="connText">连接中</span></span>
+    <span>IP: <span id="ipAddr">-</span></span>
+  </div>
+</div>
+
+<div class="container">
+  <div class="card presence-card">
+    <div class="presence-icon empty" id="presIcon">&#9675;</div>
+    <div class="presence-text empty" id="presText">检测中...</div>
+    <div class="presence-sub" id="presSub">等待数据</div>
+  </div>
+
+  <div class="stats-row">
+    <div class="card stat-card">
+      <div class="stat-label">信号强度 RSSI</div>
+      <div class="stat-value rssi" id="rssiVal">--</div>
+      <div class="stat-label">dBm</div>
+    </div>
+    <div class="card stat-card">
+      <div class="stat-label">CSI 方差</div>
+      <div class="stat-value variance" id="varVal">--</div>
+      <div class="stat-label">振幅</div>
+    </div>
+    <div class="card stat-card">
+      <div class="stat-label">置信度</div>
+      <div class="stat-value confidence" id="confVal">--</div>
+      <div class="stat-label">%</div>
+    </div>
+    <div class="card stat-card">
+      <div class="stat-label">检测状态</div>
+      <div class="stat-value uptime" id="stateVal">--</div>
+      <div class="stat-label" id="stateSub">--</div>
+    </div>
+  </div>
+
+  <div class="card" style="grid-column:1/-1">
+    <h2>CSI 子载波波形</h2>
+    <canvas id="csiCanvas" class="wave-canvas"></canvas>
+  </div>
+
+  <div class="card">
+    <h2>方差趋势</h2>
+    <canvas id="varCanvas"></canvas>
+    <div class="legend"><span class="l-var">方差</span></div>
+  </div>
+
+  <div class="card">
+    <h2>RSSI / 置信度趋势</h2>
+    <canvas id="rssiCanvas"></canvas>
+    <div class="legend"><span class="l-rssi">RSSI</span><span class="l-conf">置信度</span></div>
+  </div>
+</div>
+
+<a href="/config" class="config-link">&#9881; WiFi 配置</a>
+
+<script>
+const H=80;varHist=[];rssiHist=[];confHist=[];
+csiData=new Array(56).fill(0);
+let canvasReady=false;
+let pollFailCount=0;
+
+function resizeCanvases(){
+  ['csiCanvas','varCanvas','rssiCanvas'].forEach(id=>{
+    let c=document.getElementById(id);
+    let cw=c.clientWidth,ch=c.clientHeight;
+    if(cw>0&&ch>0){
+      let dpr=window.devicePixelRatio||1;
+      c.width=Math.floor(cw*dpr);
+      c.height=Math.floor(ch*dpr);
+      canvasReady=true;
+    }
+  });
+}
+
+function drawLine(canvas,data,color,min,max){
+  if(!canvasReady||!canvas||!canvas.getContext)return;
+  const ctx=canvas.getContext('2d');
+  const w=canvas.width,h=canvas.height;
+  if(w<10||h<10)return;
+  ctx.clearRect(0,0,w,h);
+  ctx.strokeStyle='#1e2a4a';ctx.lineWidth=1;
+  for(let i=0;i<5;i++){let y=h*i/5;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke()}
+  if(data.length<2)return;
+  let range=max-min;if(range<1)range=1;
+  // fill
+  ctx.beginPath();
+  for(let i=0;i<data.length;i++){
+    let x=i*w/(data.length-1);let y=h-((data[i]-min)/range)*h*0.85-h*0.075;
+    i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  }
+  ctx.lineTo(w,h);ctx.lineTo(0,h);ctx.closePath();
+  ctx.fillStyle=color.replace('1)','0.12)');ctx.fill();
+  // line
+  ctx.strokeStyle=color;ctx.lineWidth=2;ctx.beginPath();
+  for(let i=0;i<data.length;i++){
+    let x=i*w/(data.length-1);let y=h-((data[i]-min)/range)*h*0.85-h*0.075;
+    i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+}
+
+function drawDualLine(canvas,data1,color1,min1,max1,data2,color2,min2,max2){
+  if(!canvasReady||!canvas||!canvas.getContext)return;
+  const ctx=canvas.getContext('2d');
+  const w=canvas.width,h=canvas.height;
+  if(w<10||h<10)return;
+  ctx.clearRect(0,0,w,h);
+  ctx.strokeStyle='#1e2a4a';ctx.lineWidth=1;
+  for(let i=0;i<5;i++){let y=h*i/5;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke()}
+  [[data1,color1,min1,max1],[data2,color2,min2,max2]].forEach(([data,color,min,max])=>{
+    if(data.length<2)return;
+    let range=max-min;if(range<1)range=1;
+    ctx.beginPath();
+    for(let i=0;i<data.length;i++){
+      let x=i*w/(data.length-1);let y=h-((data[i]-min)/range)*h*0.85-h*0.075;
+      i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+    }
+    ctx.lineTo(w,h);ctx.lineTo(0,h);ctx.closePath();
+    ctx.fillStyle=color.replace('1)','0.1)');ctx.fill();
+    ctx.strokeStyle=color;ctx.lineWidth=2;ctx.beginPath();
+    for(let i=0;i<data.length;i++){
+      let x=i*w/(data.length-1);let y=h-((data[i]-min)/range)*h*0.85-h*0.075;
+      i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+  });
+}
+
+function drawBars(canvas,data){
+  if(!canvasReady||!canvas||!canvas.getContext)return;
+  const ctx=canvas.getContext('2d');
+  const w=canvas.width,h=canvas.height;
+  if(w<10||h<10)return;
+  ctx.clearRect(0,0,w,h);
+  ctx.strokeStyle='#1e2a4a';ctx.lineWidth=1;
+  for(let i=0;i<5;i++){let y=h*i/5;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke()}
+  // center line
+  ctx.strokeStyle='rgba(79,195,247,0.15)';ctx.beginPath();ctx.moveTo(0,h/2);ctx.lineTo(w,h/2);ctx.stroke();
+  let maxVal=0;
+  for(let i=0;i<data.length;i++){let v=Math.abs(data[i]);if(v>maxVal)maxVal=v;}
+  if(maxVal<1)maxVal=1;
+  let step=w/data.length;
+  let bw=Math.max(step*0.7,1);
+  for(let i=0;i<data.length;i++){
+    let x=i*step+step*0.15;
+    let barH=Math.abs(data[i])/maxVal*h*0.4;
+    if(barH<0.5)continue;
+    let y=data[i]>=0?h/2-barH:h/2;
+    let grad=ctx.createLinearGradient(0,y,0,y+barH);
+    if(data[i]>=0){grad.addColorStop(0,'#4fc3f7');grad.addColorStop(1,'#0288d1')}
+    else{grad.addColorStop(0,'#ef5350');grad.addColorStop(1,'#c62828')}
+    ctx.fillStyle=grad;
+    ctx.fillRect(x,y,bw,barH);
+  }
+}
+
+function updateUI(d){
+  // 连接状态：AP 在线就算连接（用户通过 AP 访问）
+  let isOnline=d.ap_active||d.connected;
+  let connText=isOnline?(d.connected?'WiFi 已连接':'AP 热点在线'):'未连接';
+
+  let icon=document.getElementById('presIcon');
+  let text=document.getElementById('presText');
+  let sub=document.getElementById('presSub');
+  if(d.presence){
+    icon.innerHTML='&#9673;';icon.className='presence-icon occupied pulse';
+    text.textContent='室内有人';text.className='presence-text occupied';
+  }else{
+    icon.innerHTML='&#9675;';icon.className='presence-icon empty';
+    text.textContent='室内无人';text.className='presence-text empty';
+  }
+  sub.textContent='置信度: '+d.confidence+'% | RSSI: '+d.rssi+' dBm | CSI: '+(d.csi_count||0);
+  document.getElementById('rssiVal').textContent=d.rssi;
+  document.getElementById('varVal').textContent=d.variance.toFixed(1);
+  document.getElementById('confVal').textContent=d.confidence;
+  document.getElementById('stateVal').textContent=d.presence?'有人':'无人';
+  document.getElementById('stateSub').textContent=connText;
+  document.getElementById('ipAddr').textContent=d.ip||'192.168.4.1';
+  document.getElementById('connDot').className='status-dot '+(isOnline?'online':'offline');
+  document.getElementById('connText').textContent=connText;
+
+  varHist.push(d.variance);if(varHist.length>H)varHist.shift();
+  rssiHist.push(d.rssi);if(rssiHist.length>H)rssiHist.shift();
+  confHist.push(d.confidence);if(confHist.length>H)confHist.shift();
+
+  if(varHist.length>=2){
+    let varMax=0;for(let i=0;i<varHist.length;i++){if(varHist[i]>varMax)varMax=varHist[i];}
+    drawLine(document.getElementById('varCanvas'),varHist,'rgba(255,213,79,1)',0,Math.max(50,varMax));
+  }
+  if(rssiHist.length>=2&&confHist.length>=2){
+    drawDualLine(document.getElementById('rssiCanvas'),rssiHist,'rgba(79,195,247,1)',-100,0,confHist,'rgba(206,147,216,1)',0,100);
+  }
+
+  if(d.csi&&d.csi.length){
+    csiData=d.csi;
+    drawBars(document.getElementById('csiCanvas'),csiData);
+  }
+}
+
+// 初始化
+window.addEventListener('load',function(){
+  setTimeout(function(){
+    resizeCanvases();
+    console.log('[WiFiRadar] Canvas ready:',canvasReady);
+  },300);
+});
+window.addEventListener('resize',function(){resizeCanvases();});
+
+// 数据轮询
+setInterval(function(){
+  fetch('/api/csi').then(r=>{
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    return r.json();
+  }).then(d=>{
+    pollFailCount=0;
+    updateUI(d);
+  }).catch(e=>{
+    pollFailCount++;
+    if(pollFailCount<3)console.log('[WiFiRadar] poll error:',e);
+  });
+},800);
+</script>
+</body>
+</html>

@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WiFi Radar - WiFi 配置</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#0a0e17;color:#e0e6f0;min-height:100vh;display:flex;align-items:center;justify-content:center}
+.card{background:linear-gradient(145deg,#141b2d,#111827);border:1px solid #1e2a4a;border-radius:16px;padding:40px;width:420px;max-width:95vw}
+h1{font-size:22px;margin-bottom:5px;background:linear-gradient(90deg,#4fc3f7,#81d4fa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.subtitle{color:#8892b0;font-size:13px;margin-bottom:25px}
+.form-group{margin-bottom:18px}
+label{display:block;font-size:13px;color:#8892b0;margin-bottom:6px}
+input,select{width:100%;padding:12px 14px;background:#0d1225;border:1px solid #1e2a4a;border-radius:8px;color:#e0e6f0;font-size:15px;outline:none;transition:.3s}
+input:focus,select:focus{border-color:#4fc3f7;box-shadow:0 0 0 3px rgba(79,195,247,.15)}
+.btn{width:100%;padding:14px;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;transition:.3s;margin-top:8px}
+.btn-primary{background:linear-gradient(135deg,#4fc3f7,#0288d1);color:#fff}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 4px 15px rgba(79,195,247,.3)}
+.btn-secondary{background:#1e2a4a;color:#8892b0;margin-top:10px}
+.btn-secondary:hover{background:#2a3a5c;color:#e0e6f0}
+.scan-result{padding:12px;background:#0d1225;border:1px solid #1e2a4a;border-radius:8px;margin:6px 0;cursor:pointer;transition:.3s;display:flex;justify-content:space-between;align-items:center}
+.scan-result:hover{border-color:#4fc3f7;background:#141b2d}
+.scan-ssid{font-size:14px}
+.scan-rssi{font-size:12px;color:#8892b0}
+.scan-lock{color:#ffd54f;font-size:11px;margin-left:4px}
+.scan-list{max-height:240px;overflow-y:auto;margin:10px 0}
+.scan-btn{background:none;border:1px solid #1e2a4a;color:#4fc3f7;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:13px;margin-bottom:15px}
+.scan-btn:hover{background:#1e2a4a}
+.back-link{display:inline-block;margin-top:20px;color:#8892b0;text-decoration:none;font-size:13px}
+.back-link:hover{color:#4fc3f7}
+.toast{position:fixed;top:20px;right:20px;padding:14px 22px;border-radius:8px;font-size:14px;opacity:0;transition:.3s;z-index:100}
+.toast.show{opacity:1}
+.toast.success{background:#2e7d32;color:#fff}
+.toast.error{background:#c62828;color:#fff}
+.divider{border:none;border-top:1px solid #1e2a4a;margin:20px 0}
+.current-info{font-size:13px;color:#8892b0;margin-bottom:15px}
+.current-info span{color:#4fc3f7}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>&#9678; WiFi 配置</h1>
+  <p class="subtitle">配置 ESP32 连接的 WiFi 网络</p>
+
+  <div class="current-info" id="currentInfo">当前状态: 加载中...</div>
+
+  <button class="scan-btn" onclick="scanWiFi()">&#128269; 扫描附近 WiFi</button>
+
+  <div class="scan-list" id="scanList" style="display:none"></div>
+
+  <hr class="divider">
+
+  <form id="wifiForm" onsubmit="return saveConfig(event)">
+    <div class="form-group">
+      <label>WiFi 名称 (SSID)</label>
+      <input type="text" id="ssidInput" placeholder="输入或从扫描结果选择" required>
+    </div>
+    <div class="form-group">
+      <label>WiFi 密码</label>
+      <input type="password" id="passInput" placeholder="输入 WiFi 密码">
+    </div>
+    <button type="submit" class="btn btn-primary" id="saveBtn">保存并连接</button>
+  </form>
+
+  <a href="/" class="back-link">&#8592; 返回仪表盘</a>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+function showToast(msg,type){
+  let t=document.getElementById('toast');
+  t.textContent=msg;t.className='toast '+type+' show';
+  setTimeout(()=>t.className='toast',3000);
+}
+
+function loadConfig(){
+  fetch('/api/config').then(r=>r.json()).then(d=>{
+    let info=document.getElementById('currentInfo');
+    if(d.configured){
+      info.innerHTML='当前配置: <span>'+d.ssid+'</span> '+(d.connected?'&#10003; 已连接':'&#10007; 未连接');
+    }else{
+      info.textContent='尚未配置 WiFi';
+    }
+    if(d.ssid)document.getElementById('ssidInput').value=d.ssid;
+  }).catch(()=>{});
+}
+
+function scanWiFi(){
+  let list=document.getElementById('scanList');
+  list.style.display='block';
+  list.innerHTML='<div style="padding:10px;color:#8892b0;text-align:center">扫描中...</div>';
+
+  fetch('/api/scan').then(r=>r.json()).then(data=>{
+    if(!data.aps||!data.aps.length){
+      list.innerHTML='<div style="padding:10px;color:#8892b0;text-align:center">未找到 WiFi</div>';
+      return;
+    }
+    list.innerHTML='';
+    data.aps.sort((a,b)=>b.rssi-a.rssi);
+    data.aps.forEach(ap=>{
+      let div=document.createElement('div');
+      div.className='scan-result';
+      let lockIcon=ap.auth>0?'<span class="scan-lock">&#128274;</span>':'';
+      div.innerHTML='<span class="scan-ssid">'+ap.ssid+lockIcon+'</span><span class="scan-rssi">'+ap.rssi+' dBm | CH'+ap.channel+'</span>';
+      div.onclick=function(){
+        document.getElementById('ssidInput').value=ap.ssid;
+        document.getElementById('passInput').focus();
+      };
+      list.appendChild(div);
+    });
+  }).catch(()=>{
+    list.innerHTML='<div style="padding:10px;color:#f44336;text-align:center">扫描失败</div>';
+  });
+}
+
+function saveConfig(e){
+  e.preventDefault();
+  let ssid=document.getElementById('ssidInput').value.trim();
+  let pass=document.getElementById('passInput').value;
+  if(!ssid){showToast('请输入 WiFi 名称','error');return false}
+
+  document.getElementById('saveBtn').textContent='连接中...';
+  document.getElementById('saveBtn').disabled=true;
+
+  fetch('/api/config',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({ssid:ssid,password:pass})
+  }).then(r=>{
+    if(r.ok){
+      showToast('配置已保存，正在连接WiFi...','success');
+      pollNewIP(ssid);
+    }else{
+      showToast('保存失败','error');
+      document.getElementById('saveBtn').textContent='保存并连接';
+      document.getElementById('saveBtn').disabled=false;
+    }
+  }).catch(()=>{
+    showToast('网络错误，如果已切换WiFi请连接后访问新地址','error');
+    document.getElementById('saveBtn').textContent='保存并连接';
+    document.getElementById('saveBtn').disabled=false;
+  });
+  return false;
+}
+
+function pollNewIP(ssid){
+  let info=document.getElementById('currentInfo');
+  let tries=0;
+  let timer=setInterval(()=>{
+    tries++;
+    fetch('/api/status').then(r=>r.json()).then(d=>{
+      if(d.connected && d.ip && d.ip!=='0.0.0.0'){
+        clearInterval(timer);
+        info.innerHTML='已连接到 <span>'+ssid+'</span> &#10003;<br>新地址: <a href="http://'+d.ip+'/" style="color:#4fc3f7">http://'+d.ip+'</a><br><small style="color:#4fc3f7">AP 热点仍可访问: <a href="http://192.168.4.1/" style="color:#4fc3f7">http://192.168.4.1</a></small>';
+        document.getElementById('saveBtn').textContent='保存并连接';
+        document.getElementById('saveBtn').disabled=false;
+      }else if(d.ap_active){
+        // AP 还在，继续等 STA 连接
+        info.innerHTML='正在连接「'+ssid+'」... (AP 热点仍在线)<br><small>您可以继续通过 192.168.4.1 访问</small>';
+      }
+    }).catch(()=>{
+      if(tries>20){clearInterval(timer);
+        info.innerHTML='ESP32 正在连接「'+ssid+'」...<br><small>请重新连接 WiFiRadar_Setup 热点后 <a href="/" style="color:#4fc3f7">返回仪表盘</a></small>';
+        document.getElementById('saveBtn').textContent='保存并连接';
+        document.getElementById('saveBtn').disabled=false;
+      }
+    });
+    if(tries>20)clearInterval(timer);
+  },2000);
+}
+
+loadConfig();
+</script>
+</body>
+</html>

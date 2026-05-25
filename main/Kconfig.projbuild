@@ -1,0 +1,27 @@
+menu "WiFi Radar Configuration"
+
+    config WIFI_RADAR_AP_SSID
+        string "AP Mode SSID"
+        default "WiFiRadar_Setup"
+        help
+            SSID for the configuration AP mode.
+
+    config WIFI_RADAR_AP_PASSWORD
+        string "AP Mode Password"
+        default "12345678"
+        help
+            Password for the configuration AP mode (min 8 characters).
+
+    config WIFI_RADAR_PRESENCE_THRESHOLD
+        int "Presence Detection Threshold"
+        default 8
+        help
+            Variance threshold for human presence detection.
+
+    config WIFI_RADAR_CSI_WINDOW_SIZE
+        int "Detection Window Size"
+        default 30
+        help
+            Number of samples in the sliding window for presence detection.
+
+endmenu
