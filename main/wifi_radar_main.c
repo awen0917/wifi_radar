@@ -198,9 +198,18 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
 }
 
 // ========== WiFi AP 模式 (配置用) ==========
+static esp_netif_t *g_ap_netif = NULL;
+static esp_netif_t *g_sta_netif = NULL;
+
 static void wifi_init_ap(void)
 {
-    esp_netif_create_default_wifi_ap();
+    // AP 和 STA 的 netif 必须在 esp_wifi_start() 之前全部创建
+    if (!g_ap_netif) {
+        g_ap_netif = esp_netif_create_default_wifi_ap();
+    }
+    if (!g_sta_netif) {
+        g_sta_netif = esp_netif_create_default_wifi_sta();
+    }
 
     wifi_config_t wifi_config = {
         .ap = {
@@ -226,9 +235,10 @@ static bool g_sta_netif_created = false;
 
 static void wifi_init_sta(const char *ssid, const char *password)
 {
-    if (!g_sta_netif_created) {
-        esp_netif_create_default_wifi_sta();
-        g_sta_netif_created = true;
+    // STA netif 已在 wifi_init_ap() 中提前创建，无需再创建
+    // 如果 wifi_init_ap() 尚未调用（不应发生），在此创建
+    if (!g_sta_netif) {
+        g_sta_netif = esp_netif_create_default_wifi_sta();
     }
 
     // 停止重连定时器
